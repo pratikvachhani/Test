@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Market Movers — NSE / BSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2F0; --panel:#FFFFFF; --ink:#13241D; --muted:#5B6B64; --line:#D5DDD9;
+  --up:#0B7A4B; --up-soft:#D6EEE2; --down:#BF3A2B; --down-soft:#F6DCD7; --focus:#1F5FBF;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1A16; --panel:#16241F; --ink:#E6EEEA; --muted:#93A59D; --line:#2A3B34;
+    --up:#3CC487; --up-soft:#173A2B; --down:#F07463; --down-soft:#41201B; --focus:#7FAFFF;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1A16; --panel:#16241F; --ink:#E6EEEA; --muted:#93A59D; --line:#2A3B34;
+  --up:#3CC487; --up-soft:#173A2B; --down:#F07463; --down-soft:#41201B; --focus:#7FAFFF;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 64px}
+h1{font:800 clamp(2rem,5vw,3.25rem)/1.02 var(--display);letter-spacing:-.02em;margin:0 0 6px}
+.lede{color:var(--muted);max-width:60ch;margin:0 0 28px}
+h2{font:700 1.25rem/1.2 var(--display);margin:0 0 12px}
+button,textarea,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.intake{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px}
+.intake label{font-weight:600;display:block;margin-bottom:6px}
+.intake .hint{font-weight:400;color:var(--muted);font-size:.9rem}
+textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:10px 12px;resize:vertical;min-height:120px;font-size:.92rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;background:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:default}
+.status{color:var(--muted);font-size:.92rem}
+.status.err{color:var(--down)}
+
+/* The board: one diverging axis, losers left, gainers right */
+.board{margin-top:32px}
+.board-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.legend{display:grid;grid-template-columns:1fr 1fr;font:700 1rem var(--display);border-bottom:2px solid var(--ink);padding-bottom:6px}
+.legend span:first-child{color:var(--down)} .legend span:last-child{color:var(--up);text-align:right}
+.lines{display:grid}
+.mv{display:grid;grid-template-columns:1fr 1fr;align-items:center;min-height:52px;border-bottom:1px solid var(--line);cursor:pointer;background:none;border-left:0;border-right:0;border-top:0;padding:0;text-align:left;width:100%}
+.mv:hover{background:color-mix(in srgb,var(--panel) 70%,transparent)}
+.mv[aria-expanded="true"]{background:var(--panel)}
+.side{display:flex;align-items:center;gap:10px;height:100%;padding:6px 0}
+.side.l{justify-content:flex-end;padding-right:0}
+.side.r{padding-left:0}
+.bar{height:22px;border-radius:3px}
+.l .bar{background:var(--down);border-radius:3px 0 0 3px}
+.r .bar{background:var(--up);border-radius:0 3px 3px 0}
+.lab{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.l .lab{text-align:right}
+.lab b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22ch}
+.lab small{color:var(--muted);font-variant-numeric:tabular-nums}
+.pct{font:700 1rem var(--display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.l .pct{color:var(--down)} .r .pct{color:var(--up)}
+.r .bar + .pct{margin-left:2px}
+.mv .side.l{border-right:2px solid var(--ink)}
+
+.detail{grid-column:1/-1;background:var(--panel);border-bottom:1px solid var(--line);padding:16px 18px 18px}
+.detail .tag{display:inline-block;font-size:.82rem;font-weight:600;padding:2px 8px;border-radius:99px;margin-right:6px}
+.tag.up{background:var(--up-soft);color:var(--up)} .tag.down{background:var(--down-soft);color:var(--down)}
+.tag.conf{background:var(--bg);color:var(--muted)}
+.detail p{margin:10px 0 0;max-width:72ch}
+.detail ul{margin:8px 0 0;padding-left:20px;max-width:72ch}
+.detail .watch{color:var(--muted);font-size:.92rem}
+.deep{white-space:pre-wrap;margin-top:12px;border-top:1px dashed var(--line);padding-top:12px;max-width:72ch}
+
+.summary{margin:28px 0 0;background:var(--panel);border-left:4px solid var(--ink);padding:16px 18px;border-radius:0 10px 10px 0}
+.summary p{margin:6px 0 0;max-width:72ch}
+.note{margin-top:28px;font-size:.85rem;color:var(--muted);max-width:72ch}
+.empty{padding:28px 0;color:var(--muted)}
+[hidden]{display:none!important}
+@media (max-width:640px){
+  .lab b{max-width:12ch}
+  .lab small{display:none}
+  .pct{font-size:.9rem}
+}
+@media (prefers-reduced-motion:no-preference){
+  .bar{transition:width .5s ease-out}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Today's movers</h1>
+  <p class="lede">The board below shows the latest trading day, researched from exchange data and news. For a new day, paste the gainers and losers from NSE, Groww or any market site and the tool explains each move.</p>
+
+  <section class="intake" aria-label="Load today's data">
+    <div>
+      <label for="raw">Gainers and losers <span class="hint">— copy the tables straight from the website, any format works</span></label>
+      <textarea id="raw" rows="7" placeholder="Example:
+Top gainers
+HFCL  238.30  +4.97%
+Sterlite Technologies  955.05  +4.96%
+Top losers
+Apollo Hospitals  6820.10  -3.40%"></textarea>
+    </div>
+    <div>
+      <label for="news">Today's headlines <span class="hint">— optional, but makes the reasons far more accurate</span></label>
+      <textarea id="news" rows="4" placeholder="Paste a few lines from the market close report: index moves, crude oil, results, block deals, brokerage upgrades…"></textarea>
+    </div>
+    <div class="row">
+      <button class="btn" id="load">Build today's list</button>
+      <button class="btn ghost" id="explain" hidden>Explain the moves</button>
+      <button class="btn ghost" id="stop" hidden>Stop</button>
+      <span class="status" id="status" role="status"></span>
+    </div>
+  </section>
+
+  <div class="summary" id="summary" hidden>
+    <h2>The day in one read</h2>
+    <div id="summaryBody"></div>
+  </div>
+
+  <section class="board" aria-label="Movers board">
+    <div class="board-head">
+      <h2 id="boardTitle">Movers board</h2>
+      <span class="row"><span class="status" id="count"></span><button class="btn ghost" id="snapBtn" hidden>Show latest researched day</button></span>
+    </div>
+    <div class="legend" aria-hidden="true"><span>Falling</span><span>Rising</span></div>
+    <div class="lines" id="lines"><p class="empty">Paste data above and press Build today's list. Tap any stock to see why it moved.</p></div>
+  </section>
+
+  <p class="note">Reasons are AI-generated explanations from the prices and headlines you provide. They are likely drivers, not confirmed facts, and not investment advice. Check exchange filings and news before you trade.</p>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const state = { gainers: [], losers: [], analysis: {}, summary: null, open: null };
+  let sample = null, ctl = null;
+
+
+  // ---------- latest researched session (filled in by Claude from news + NSE data) ----------
+  const SNAPSHOT = {
+    label: "Nifty 50 movers — Thursday, 1 Oct 2026 close",
+    gainers: [
+      {name:"Infosys",symbol:"INFY",price:1035.00,changePct:4.11},
+      {name:"HDFC Life",symbol:"HDFCLIFE",price:534.20,changePct:2.49},
+      {name:"HDFC Bank",symbol:"HDFCBANK",price:721.20,changePct:1.76},
+      {name:"SBI Life",symbol:"SBILIFE",price:1721.60,changePct:1.49},
+      {name:"Max Healthcare",symbol:"MAXHEALTH",price:940.95,changePct:1.20}
+    ],
+    losers: [
+      {name:"Bajaj Auto",symbol:"BAJAJ-AUTO",price:10045.00,changePct:-7.62},
+      {name:"Maruti Suzuki",symbol:"MARUTI",price:11386.00,changePct:-4.86},
+      {name:"Shriram Finance",symbol:"SHRIRAMFIN",price:945.00,changePct:-3.84},
+      {name:"Tata Steel",symbol:"TATASTEEL",price:178.00,changePct:-3.42},
+      {name:"Adani Ports",symbol:"ADANIPORTS",price:1737.80,changePct:-3.36}
+    ],
+    summary: {
+      text: "Nifty 50 fell 0.88% to 22,421.95 and only 13 of its 50 stocks rose. Foreign investors sold a net ₹9,484 crore while domestic institutions bought ₹10,042 crore. Brent crude above $100 and the rupee near 96.3 per dollar kept pressure on the market. Auto was the worst sector (−3.46%) after September sales data, while IT was the only sector to rise (+2.17%).",
+      themes: ["Auto sell-off on September sales","IT rebound","Heavy FII selling","Crude above $100","Metals weak (−2.35%)"]
+    },
+    analysis: {
+      "Infosys": {reason:"The whole IT sector rallied. US PCE inflation came in softer than expected, easing fears of another US Fed rate hike, and investors bought IT stocks ahead of Accenture's quarterly results, which are seen as a signal for Indian IT demand. IT stocks had also fallen about 10% in a month, so this was partly a bounce from low levels.",factors:["Softer US inflation data","Accenture results in focus","Rebound after steep monthly fall"],confidence:"High",watch:"Accenture's results and outlook, and Infosys's own Q2 results later in October.",sources:"Upstox, MarketsMojo"},
+      "HDFC Life": {reason:"No company-specific news was found. Fellow insurer SBI Life also rose, which points to a sector-wide move. On a day when foreign investors sold heavily and domestic funds bought, money favoured large, steady financial stocks.",factors:["Insurance sector buying","Domestic institutional buying","Defensive large-cap preference"],confidence:"Low",watch:"Monthly life insurance premium data released early in the month.",sources:"Inferred from sector moves"},
+      "HDFC Bank": {reason:"No specific trigger was found. Bank Nifty fell only 0.33% while the broader market fell almost 1%, so large private banks held up better. Domestic institutions buying heavyweight stocks likely supported it.",factors:["Large banks outperformed","Domestic institutional buying"],confidence:"Low",watch:"The bank's Q2 business update, which usually comes in the first week of October.",sources:"Inferred from index data"},
+      "SBI Life": {reason:"Moved together with HDFC Life, suggesting buying in the life insurance sector rather than company news. No specific trigger was found.",factors:["Insurance sector buying","Defensive large-cap preference"],confidence:"Low",watch:"Monthly premium growth numbers.",sources:"Inferred from sector moves"},
+      "Max Healthcare": {reason:"Max Healthcare was among the top losers the previous day (30 Sept), so part of this gain is a rebound. Hospital stocks were also in focus after a Jefferies note recommending the sector appeared in recent coverage.",factors:["Rebound after previous day's fall","Positive brokerage view on hospitals"],confidence:"Medium",watch:"Whether the hospital sector holds gains after the brokerage interest fades.",sources:"Business Standard, Business Today"},
+      "Bajaj Auto": {reason:"September sales disappointed. Domestic two-wheeler sales fell about 12% from a year ago to 2,39,771 units. Total sales grew 5% to 538,443, but this missed market expectations of about 570,000 units. Exports jumped 34%, but that couldn't offset worries about weak demand in India just before the festive season.",factors:["Domestic sales fell ~12% YoY","Total sales missed estimates","Already down ~17% in a month"],confidence:"High",watch:"October festive-season sales and Q2 results.",sources:"Business Today, CNBC, Investing.com"},
+      "Maruti Suzuki": {reason:"Maruti's own numbers were strong: total sales up 24% to 2,36,013 and utility vehicles up 62%. The stock still fell because the whole auto sector was sold after weak data from peers and slowing momentum versus August's record. Crude near $100 also adds to worries about car demand.",factors:["Auto sector sell-off","Doubts whether strong dispatches will turn into retail sales","High crude oil prices"],confidence:"Medium",watch:"Actual retail registrations during the festive season, compared with factory dispatches.",sources:"Rushlane, CNBC, IndMoney"},
+      "Shriram Finance": {reason:"No company-specific news was found. As a large vehicle financier, its sentiment is tied to auto and tractor demand, which looked weak in September data. Broad selling by foreign investors added pressure.",factors:["Linked to weak auto/tractor sales","FII selling in financials"],confidence:"Low",watch:"Q2 business update on loan growth and asset quality.",sources:"Inferred from sector moves"},
+      "Tata Steel": {reason:"The metal index fell 2.35%, so this was a sector-wide fall rather than company news. Volume was very high (over 4.6 crore shares), which suggests large investors were selling.",factors:["Metal sector weakness","Heavy selling volume","FII outflows"],confidence:"Low",watch:"Global steel prices and China demand news.",sources:"HDFC Sky, index data"},
+      "Adani Ports": {reason:"No specific trigger was found. It was among the main Sensex laggards in a broad market fall, with high crude prices and foreign selling weighing on large caps.",factors:["Broad market selling","Crude above $100"],confidence:"Low",watch:"Monthly cargo volume update, usually released early in the month.",sources:"Business Standard"}
+    }
+  };
+
+  // ---------- storage (per-viewer convenience) ----------
+  function save(){ try{ localStorage.setItem("movers-v1", JSON.stringify({raw:$("raw").value,news:$("news").value,state})); }catch(e){} }
+  function restore(){
+    try{
+      const s = JSON.parse(localStorage.getItem("movers-v1")||"null");
+      if(!s) return;
+      $("raw").value = s.raw||""; $("news").value = s.news||"";
+      if(s.state && ((s.state.gainers||[]).length || (s.state.losers||[]).length)){ Object.assign(state, s.state, {open:null}); return true; }
+    }catch(e){}
+    return false;
+  }
+  function loadSnapshot(){
+    Object.assign(state, {gainers:SNAPSHOT.gainers, losers:SNAPSHOT.losers, analysis:SNAPSHOT.analysis, summary:SNAPSHOT.summary, label:SNAPSHOT.label, open:null});
+  }
+
+  // ---------- simple local parser (fallback when Claude isn't available) ----------
+  function localParse(text){
+    const g=[], l=[]; let mode=null;
+    text.split(/\n/).forEach(line=>{
+      const t=line.trim(); if(!t) return;
+      if(/gainer|rising|top high|advance/i.test(t) && !/\d/.test(t)){mode="g";return;}
+      if(/loser|falling|top low|decline/i.test(t) && !/\d/.test(t)){mode="l";return;}
+      const pctM = t.match(/([+-−]?\d+(?:\.\d+)?)\s*%/);
+      if(!pctM) return;
+      let pct = parseFloat(pctM[1].replace("−","-"));
+      const name = t.split(/\s{2,}|\t|₹|\|/)[0].replace(/[\d.,+%-]+$/,"").trim() || t.replace(/[\d₹.,+%|-]+/g," ").trim();
+      const nums = t.replace(pctM[0],"").match(/\d[\d,]*\.\d+|\d[\d,]{2,}/g);
+      const price = nums ? parseFloat(nums[0].replace(/,/g,"")) : null;
+      if(mode==="l" && pct>0) pct=-pct;
+      const item={name,symbol:"",price,changePct:pct};
+      (pct<0 ? l : g).push(item);
+    });
+    return {gainers:g,losers:l};
+  }
+
+  function clean(list, sign){
+    return (Array.isArray(list)?list:[])
+      .filter(x=>x && x.name && isFinite(+x.changePct))
+      .map(x=>({name:String(x.name).slice(0,60),symbol:String(x.symbol||"").slice(0,20),price:isFinite(+x.price)&&x.price!==null?+x.price:null,changePct:sign*Math.abs(+x.changePct)}))
+      .sort((a,b)=>Math.abs(b.changePct)-Math.abs(a.changePct)).slice(0,15);
+  }
+
+  function errCopy(e){
+    const c = e && e.code;
+    if(c==="not_granted") return "Claude access was declined, so analysis is off. The board still works with the basic parser.";
+    if(c==="rate_limited") return "Too many requests right now. Wait a minute, then try again.";
+    if(c==="cancelled") return "Stopped.";
+    return "Claude couldn't finish that request. Try again, or paste less data at once.";
+  }
+
+  // ---------- load ----------
+  $("load").onclick = async ()=>{
+    const raw = $("raw").value.trim();
+    if(!raw){ setStatus("Paste a gainers and losers list first.", true); return; }
+    state.analysis={}; state.summary=null; state.open=null; state.label="Your pasted list";
+    $("load").disabled=true;
+    let parsed=null;
+    if(sample){
+      setStatus("Reading your list…");
+      try{
+        parsed = await sample.json(
+`Extract Indian stock market top gainers and top losers from the pasted text below.
+Return ONLY JSON: {"gainers":[{"name":string,"symbol":string,"price":number|null,"changePct":number}],"losers":[same]}.
+changePct is the day's percentage change (positive for gainers, negative for losers). Use the NSE symbol if you are confident, else "". Do not invent stocks that are not in the text. Max 15 each.
+
+TEXT:
+${raw.slice(0,12000)}`, {modelTier:"quick"});
+      }catch(e){
+        if(e && e.code==="not_granted") sample=null;
+        setStatus(errCopy(e)+" Using the basic parser.", true);
+      }
+    }
+    if(!parsed) parsed = localParse(raw);
+    state.gainers = clean(parsed.gainers, 1);
+    state.losers = clean(parsed.losers, -1);
+    $("load").disabled=false;
+    if(!state.gainers.length && !state.losers.length){
+      setStatus("No stocks with a % change were found. Make sure each line has a name and a percentage.", true);
+    } else if(!$("status").classList.contains("err")) {
+      setStatus(sample ? "List ready. Press Explain the moves for the reasons." : "List ready.");
+    }
+    save(); render();
+  };
+
+  // ---------- explain all ----------
+  $("explain").onclick = async ()=>{
+    if(!sample) return;
+    const all=[...state.gainers,...state.losers];
+    if(!all.length) return;
+    ctl = new AbortController();
+    $("explain").disabled=true; $("stop").hidden=false;
+    setStatus("Claude is analysing the moves. This usually takes 20–60 seconds…");
+    const news = $("news").value.trim();
+    const listTxt = all.map(s=>`${s.name}${s.symbol?" ("+s.symbol+")":""}: ${s.changePct>0?"+":""}${s.changePct}%${s.price!=null?" at ₹"+s.price:""}`).join("\n");
+    try{
+      const out = await sample.json(
+`You are an Indian equity market analyst writing for retail investors.
+For each stock below, explain the most likely reason it rose or fell today. Use the headlines if given; otherwise reason from the stock's sector, typical drivers (quarterly results, order wins, brokerage rating changes, block deals, F&O expiry, crude oil, rupee, FII flows, government policy, global cues, sector rotation, profit booking after a rally, upper/lower circuit in small caps) and how the stock moved alongside peers in the same list.
+Be honest: if you are inferring rather than citing a headline, say so through the confidence field. Never invent specific numbers, deal names or news events that are not in the headlines.
+
+Return ONLY JSON:
+{"summary":"3-4 sentences on the day's overall theme: which sectors led, which lagged, and the likely macro driver",
+ "themes":["short sector/theme phrases"],
+ "stocks":{"<exact stock name>":{"reason":"2-3 plain sentences","factors":["2-4 short driver phrases"],"confidence":"High"|"Medium"|"Low","watch":"one sentence on what to watch next"}}}
+
+STOCKS:
+${listTxt}
+
+HEADLINES (may be empty):
+${news.slice(0,8000) || "(none provided)"}`, {signal:ctl.signal, modelTier:"default"});
+      state.summary = {text: out.summary||"", themes: Array.isArray(out.themes)?out.themes.slice(0,6):[]};
+      state.analysis = out.stocks && typeof out.stocks==="object" ? out.stocks : {};
+      setStatus("Done. Tap any stock to read its reason.");
+      save(); render();
+    }catch(e){
+      if(e && e.code==="not_granted"){ sample=null; }
+      setStatus(errCopy(e), e && e.code!=="cancelled");
+      render();
+    }finally{
+      $("explain").disabled=false; $("stop").hidden=true;
+    }
+  };
+  $("stop").onclick = ()=> ctl && ctl.abort();
+  $("snapBtn").onclick = ()=>{ loadSnapshot(); save(); render(); };
+
+  // ---------- render ----------
+  function setStatus(t, err){ const s=$("status"); s.textContent=t; s.classList.toggle("err",!!err); }
+  function fmtPrice(p){ return p==null ? "" : "₹"+p.toLocaleString("en-IN",{maximumFractionDigits:2}); }
+  function lookup(name){
+    if(state.analysis[name]) return state.analysis[name];
+    const k = Object.keys(state.analysis).find(k=>k.toLowerCase().includes(name.toLowerCase().slice(0,8)) || name.toLowerCase().includes(k.toLowerCase().slice(0,8)));
+    return k ? state.analysis[k] : null;
+  }
+
+  function sideHTML(s, cls, max){
+    if(!s) return `<div class="side ${cls}"></div>`;
+    const w = Math.max(4, Math.round(Math.abs(s.changePct)/max*100*0.45));
+    const pct = (s.changePct>0?"+":"")+s.changePct.toFixed(2)+"%";
+    const lab = `<span class="lab"><b>${esc(s.name)}</b><small>${esc(fmtPrice(s.price))}</small></span>`;
+    return cls==="l"
+      ? `<div class="side l">${lab}<span class="pct">${pct}</span><span class="bar" style="width:${w}%"></span></div>`
+      : `<div class="side r"><span class="bar" style="width:${w}%"></span><span class="pct">${pct}</span>${lab}</div>`;
+  }
+
+  function detailHTML(s){
+    const a = lookup(s.name);
+    const dir = s.changePct>0 ? `<span class="tag up">Up ${s.changePct.toFixed(2)}%</span>` : `<span class="tag down">Down ${Math.abs(s.changePct).toFixed(2)}%</span>`;
+    if(!a){
+      return `<div class="detail">${dir}<p><b>${esc(s.name)}</b>${s.price!=null?" closed at "+esc(fmtPrice(s.price)):""}.</p>
+        <p class="watch">${sample ? "No reason yet. Press Explain the moves, or dig into this stock alone." : "Analysis needs Claude access, which isn't available in this view."}</p>
+        ${sample?`<div class="row" style="margin-top:12px"><button class="btn ghost" data-deep="${esc(s.name)}">Dig into ${esc(s.name)}</button></div>`:""}
+        <div class="deep" data-out hidden></div></div>`;
+    }
+    return `<div class="detail">${dir}${a.confidence?`<span class="tag conf">${esc(a.confidence)} confidence</span>`:""}
+      <p>${esc(a.reason||"")}</p>
+      ${Array.isArray(a.factors)&&a.factors.length?`<ul>${a.factors.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>`:""}
+      ${a.watch?`<p class="watch"><b>What to watch:</b> ${esc(a.watch)}</p>`:""}
+      ${a.sources?`<p class="watch"><b>Based on:</b> ${esc(a.sources)}</p>`:""}
+      ${sample?`<div class="row" style="margin-top:12px"><button class="btn ghost" data-deep="${esc(s.name)}">Dig deeper</button></div>`:""}
+      <div class="deep" data-out hidden></div></div>`;
+  }
+
+  function render(){
+    const n = Math.max(state.gainers.length, state.losers.length);
+    $("explain").hidden = !(sample && n);
+    $("boardTitle").textContent = state.label || "Movers board";
+    $("snapBtn").hidden = state.label===SNAPSHOT.label;
+    $("count").textContent = n ? `${state.gainers.length} rising, ${state.losers.length} falling` : "";
+    // summary
+    if(state.summary && state.summary.text){
+      $("summary").hidden=false;
+      $("summaryBody").innerHTML = `<p>${esc(state.summary.text)}</p>` +
+        (state.summary.themes.length? `<p>${state.summary.themes.map(t=>`<span class="tag conf">${esc(t)}</span>`).join(" ")}</p>`:"");
+    } else $("summary").hidden=true;
+
+    if(!n){ $("lines").innerHTML = `<p class="empty">Paste data above and press Build today's list. Tap any stock to see why it moved.</p>`; return; }
+    const max = Math.max(...[...state.gainers,...state.losers].map(s=>Math.abs(s.changePct)), 1);
+    let html="";
+    for(let i=0;i<n;i++){
+      const L=state.losers[i], G=state.gainers[i];
+      html += `<div class="mv-row" style="display:contents">
+        <div class="mv" style="cursor:default">
+          ${L?`<button class="side-btn" data-pick="l${i}" aria-expanded="${state.open==="l"+i}" aria-label="Why ${esc(L.name)} fell" style="all:unset;display:block;height:100%;cursor:pointer">${sideHTML(L,"l",max)}</button>`:`<div class="side l"></div>`}
+          ${G?`<button class="side-btn" data-pick="g${i}" aria-expanded="${state.open==="g"+i}" aria-label="Why ${esc(G.name)} rose" style="all:unset;display:block;height:100%;cursor:pointer">${sideHTML(G,"r",max)}</button>`:`<div class="side r"></div>`}
+        </div>
+        ${state.open==="l"+i&&L?detailHTML(L):""}${state.open==="g"+i&&G?detailHTML(G):""}
+      </div>`;
+    }
+    $("lines").innerHTML = html;
+  }
+
+  $("lines").addEventListener("click", async ev=>{
+    const pick = ev.target.closest("[data-pick]");
+    if(pick){ const k=pick.dataset.pick; state.open = state.open===k?null:k; render(); return; }
+    const deep = ev.target.closest("[data-deep]");
+    if(deep && sample){
+      const name = deep.dataset.deep;
+      const s = [...state.gainers,...state.losers].find(x=>x.name===name);
+      const out = deep.closest(".detail").querySelector("[data-out]");
+      out.hidden=false; out.textContent="Thinking…"; deep.disabled=true;
+      const a = lookup(name);
+      try{
+        await sample(
+`You are an Indian equity analyst. Give a deeper, plain-English explanation of why ${name} moved ${s.changePct>0?"+":""}${s.changePct}% today${s.price!=null?" to ₹"+s.price:""}.
+Cover: the likely trigger, the sector context, what kind of investor activity usually drives a move like this (FII/DII, retail, F&O, circuit limits), the key risks, and 3 things to check before acting (e.g. exchange announcements, results date, volume vs average).
+${a?"Earlier quick read: "+a.reason:""}
+Today's headlines provided by the user: ${$("news").value.trim().slice(0,6000)||"(none)"}
+Do not invent specific news, numbers or deals that are not in the headlines; say clearly when you are inferring. Plain text, short paragraphs, under 250 words. No investment advice.`,
+          {onText:({text})=>{ out.textContent=text; }, modelTier:"default"});
+      }catch(e){ out.textContent = (e && e.text) || errCopy(e); if(e&&e.code==="not_granted") sample=null; }
+      finally{ deep.disabled=false; }
+    }
+  });
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+  // ---------- boot ----------
+  if(!restore()) loadSnapshot(); render();
+  if(window.claude && claude.use){
+    claude.use("sample").then(fn=>{ sample=fn; render(); }).catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
